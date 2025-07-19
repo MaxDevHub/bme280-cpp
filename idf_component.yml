@@ -1,0 +1,4 @@
+version: "1.0.0"
+description: "A simple BME280 component for ESP-IDF"
+dependencies:
+  idf: '>=5.4'

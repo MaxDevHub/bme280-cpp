@@ -1,0 +1,4 @@
+version: "1.0.0"
+dependencies:
+  MaxDevHub/bme280-component:
+    override_path: '../../../'
