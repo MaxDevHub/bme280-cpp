@@ -2,11 +2,8 @@
 
 #include <type_traits>
 
-#include "driver/gpio.h"
 #include "driver/i2c_master.h"
 #include "driver/spi_master.h"
-#include "esp_err.h"
-#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 namespace BME280 {
@@ -136,6 +133,8 @@ public:
   [[nodiscard]]
   uint8_t readReg(uint8_t reg) const noexcept override;
 
+  ~I2CBus() override;
+
 private:
   i2c_master_dev_handle_t _devHandle;
   i2c_device_config_t _devConfig;
@@ -153,6 +152,8 @@ public:
   uint8_t readReg(uint8_t reg) const noexcept override;
 
   inline bool getIs3WireMode() const noexcept { return _is3WireMode; }
+
+  ~SPIBus() override;
 
 private:
   spi_device_interface_config_t _devConfig;

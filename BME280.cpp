@@ -1,5 +1,7 @@
 #include "BME280.hpp"
 
+#include "driver/gpio.h"
+
 namespace BME280 {
 
 I2CBus::I2CBus(i2c_master_bus_handle_t &busHandle, uint32_t freqHz,
@@ -59,6 +61,8 @@ uint8_t I2CBus::readReg(uint8_t reg) const noexcept {
   return data;
 };
 
+I2CBus::~I2CBus() { ESP_ERROR_CHECK(i2c_master_bus_rm_device(_devHandle)); }
+
 SPIBus::SPIBus(spi_host_device_t spiHost, gpio_num_t csPin, int freqHz,
                bool is3WireMode)
     : _csPin(csPin), _is3WireMode(is3WireMode) {
@@ -117,6 +121,13 @@ uint8_t SPIBus::readReg(uint8_t reg) const noexcept {
 
   return spiTransaction.rx_data[1];
 };
+
+SPIBus::~SPIBus() {
+  ESP_ERROR_CHECK(gpio_set_direction(_csPin, GPIO_MODE_DISABLE));
+  ESP_ERROR_CHECK(gpio_set_pull_mode(_csPin, GPIO_FLOATING));
+  ESP_ERROR_CHECK(gpio_reset_pin(_csPin));
+  ESP_ERROR_CHECK(spi_bus_remove_device(_devHandle));
+}
 
 bool BME280::isInitialized() const noexcept { return _isInitialized; };
 
@@ -263,7 +274,7 @@ uint32_t BME280::compensationPress() const noexcept {
   p = static_cast<uint32_t>((static_cast<int32_t>(1048576) - adcP) -
                             (var2 >> 12)) *
       3125;
-  if (p < 0x80000000) {
+  if (p < 0x8000000) {
     p = (p << 1) / static_cast<uint32_t>(var1);
   } else {
     p = (p / static_cast<uint32_t>(var1)) * 2;
