@@ -116,51 +116,121 @@ enum class StandByTime : uint8_t {
 
 enum class Spi3W : uint8_t { OFF = 0x00, ON = 0x01 };
 
+/**
+ * @brief Interface for sensor communication buses
+ */
 class ISensorBus {
 public:
-  virtual void writeReg(uint8_t reg, uint8_t data) const noexcept = 0;
-  [[nodiscard]]
-  virtual uint8_t readReg(uint8_t reg) const noexcept = 0;
+  /**
+   * @brief Virtual destructor for proper polymorphic cleanup
+   */
   virtual ~ISensorBus() = default;
+
+  /**
+   * @brief Read a register from the sensor
+   * @param reg Register address to read
+   * @return The value read from the register
+   */
+  [[nodiscard]] virtual uint8_t readReg(uint8_t reg) const noexcept = 0;
+
+  /**
+   * @brief Write to a sensor register
+   * @param reg Register address to write
+   * @param data Data byte to write
+   */
+  virtual void writeReg(uint8_t reg, uint8_t data) const noexcept = 0;
 };
 
+/**
+ * @brief I2C bus implementation for sensor communication
+ * @implements ISensorBus
+ * @final
+ */
 class I2CBus final : public ISensorBus {
 public:
+  /**
+   * @brief Constructor a new I2CBus instance
+   * @param busHandle Reference to initialized I2C master bus handle
+   * @param freqHz I2C clock frequency in Hz
+   * @param devaddr Device address (from Addr enum)
+   */
   I2CBus(i2c_master_bus_handle_t &busHandle, uint32_t freqHz,
          Addr devAddr = Addr::BME280_ADDR_PRIM) noexcept;
 
-  void writeReg(uint8_t reg, uint8_t data) const noexcept override;
-  [[nodiscard]]
-  uint8_t readReg(uint8_t reg) const noexcept override;
-
+  /**
+   * @brief Destroy the I2CBus instance
+   */
   ~I2CBus() override;
 
-private:
-  i2c_master_dev_handle_t _devHandle;
-  i2c_device_config_t _devConfig;
+  /**
+   * @brief Write to a sensor register
+   * @param reg Register address to write
+   * @param data Data byte to write
+   */
+  void writeReg(uint8_t reg, uint8_t data) const noexcept override;
 
-  Addr _devAddr;
+  /**
+   * @brief Read from a sensor register
+   * @param reg Register address to read
+   * @return The read register value
+   */
+  [[nodiscard]] uint8_t readReg(uint8_t reg) const noexcept override;
+
+private:
+  i2c_master_dev_handle_t _devHandle; ///< I2C device handle
+  i2c_device_config_t _devConfig;     ///< I2C device configuration
+
+  Addr _devAddr; ///< Device I2C address
 };
 
+/**
+ * @brief SPI bus implementation for sensor communication
+ * @implements ISensorBus
+ * @final
+ */
 class SPIBus final : public ISensorBus {
 public:
+  /**
+   * @brief Constructor a new SPIBus instance
+   * @param spiHost SPI host device
+   * @param csPin Chip select GPIO pin
+   * @param freqHz SPI clock frequency in Hz
+   * @param is3WireMode Enable 3-wire (half-duplex) mode
+   */
   SPIBus(spi_host_device_t spiHost, gpio_num_t csPin, int freqHz,
          bool is3WireMode = false);
 
-  void writeReg(uint8_t reg, uint8_t data) const noexcept override;
-  [[nodiscard]]
-  uint8_t readReg(uint8_t reg) const noexcept override;
-
-  inline bool getIs3WireMode() const noexcept { return _is3WireMode; }
-
+  /**
+   * @brief Destroy the SPIBus instance
+   */
   ~SPIBus() override;
 
-private:
-  spi_device_interface_config_t _devConfig;
-  spi_device_handle_t _devHandle;
+  /**
+   * @brief Write to a sensor register
+   * @param reg Register address to write
+   * @param data Data byte to write
+   */
+  void writeReg(uint8_t reg, uint8_t data) const noexcept override;
 
-  gpio_num_t _csPin;
-  bool _is3WireMode;
+  /**
+   * @brief Read from a sensor register
+   * @param reg Register address to read
+   * @return The read register value
+   */
+  [[nodiscard]] uint8_t readReg(uint8_t reg) const noexcept override;
+
+  /**
+   * @brief Check if 3-wire mode is enable
+   * @return true if in 3-wire mode, false for 4-wire
+   */
+  inline bool getIs3WireMode() const noexcept { return _is3WireMode; }
+
+private:
+  spi_device_interface_config_t _devConfig; ///< SPI device configuration
+  spi_device_handle_t _devHandle;           ///< SPI device handle
+
+  gpio_num_t _csPin; ///< Chip select GPIO pin
+  bool _is3WireMode; ///< 3-wire mode flag
 };
 
 template <typename T>
@@ -172,6 +242,13 @@ public:
   BME280(const BME280 &) = delete;
   BME280(BME280 &&) = delete;
 
+  /**
+   * @brief Constructor a new BME280 sensor instance
+   * @tparam T Type of sensor bus must base of ISensorBus
+   * @param sensorBus Reference to the communication bus (SPI/I2C)
+   * @warning If chip ID verification fails, sensor will be marked as not
+   * initialized
+   */
   template <SensorBus T>
   explicit BME280(const T &sensorBus) noexcept : _sensorBus(sensorBus) {
     reset();
@@ -193,78 +270,225 @@ public:
     readCalibData();
   };
 
-  void setInitConfig() const noexcept;
+  /**
+   * @brief Checks if the sensor was successfull initialized
+   * @return true if sensor is properly initialized, false if initialization
+   * failed
+   */
   [[nodiscard]]
   bool isInitialized() const noexcept;
 
+  /**
+   * @brief Reads the sensor's chip ID
+   * @warning A return value other than 0x60 indicates either:
+   *          - A different sensor model is connected
+   *          - There may be a communication problem with the device
+   */
   [[nodiscard]]
   uint8_t getChipId() const noexcept;
 
+  /**
+   * @brief Sets the sensor's operating mode
+   * @param mode The operating mode to set (from Mode enum)
+   */
   void setMode(Mode mode) const noexcept;
+
+  /**
+   * @brief Gets the sensor's operating mode
+   * @return The operating mode (from Mode enum)
+   */
   [[nodiscard]]
   Mode getMode() const noexcept;
 
+  /**
+   * @brief Sets the sensor's temperature oversampling
+   * @param oversampling The temperature oversampling to set (from Oversampling
+   * enum)
+   */
   void setOversmplingTemp(const Oversampling oversampling) const noexcept;
+
+  /**
+   * @brief Gets the sensor's temperature oversampling
+   * @return The current temperature oversampling (from Oversampling enum)
+   */
   [[nodiscard]]
   Oversampling getOversamplingTemp() const noexcept;
 
+  /**
+   * @brief Sets the sensor's pressure oversampling
+   * @param oversampling The pressure oversampling to set (from Oversampling
+   * enum)
+   */
   void setOversmplingPress(const Oversampling oversampling) const noexcept;
+
+  /**
+   * @brief Gets the sensor's pressure oversampling
+   * @return The current pressure oversampling (from Oversampling enum)
+   */
   [[nodiscard]]
   Oversampling getOversamplingPress() const noexcept;
 
+  /**
+   * @brief Sets the sensor's humidity oversampling
+   * @param oversampling The humidity oversampling to set (from Oversamplig
+   * enum)
+   */
   void setOversmplingHum(const Oversampling oversampling) const noexcept;
+
+  /**
+   * @brief Gets the sensor's humidity oversampling
+   * @return The current humidity oversampling (from Oversamplig enum)
+   */
   [[nodiscard]]
   Oversampling getOversamplingHum() const noexcept;
 
+  /**
+   * @brief Sets the standby time between measurments in NORMAL mode
+   * @param standByTime The standby duration (from StandByTime enum)
+   */
   void setStandByTime(const StandByTime standByTime) const noexcept;
+
+  /**
+   * @brief Gets the standby time between measurments in NORMAL mode
+   * @return The standby duration (from StandByTime enum)
+   */
   [[nodiscard]]
   StandByTime getStandByTime() const noexcept;
 
+  /**
+   * @brief Sets the config IIR filter
+   * @param filter The filter coefficient (from Filter enum)
+   */
   void setFilter(const Filter filter) const noexcept;
+
+  /**
+   * @brief Gets the config IIR filter
+   * @return The filter coefficient (from Filter enum)
+   */
   [[nodiscard]]
   Filter getFilter() const noexcept;
 
+  /**
+   * @brief Checks if the sensor is currently performing a measurment
+   * @return true if a measurment is in progress, false othetwise
+   */
   [[nodiscard]]
   bool isMesuring() const noexcept;
 
+  /**
+   * @brief Performs temperature compensation on raw sensor data
+   * @return Return temperature in DegC, resolution is 0.01 DegC. Output value
+   * of "5123" equals 51.23 DegC
+   */
   [[nodiscard]]
   int32_t compensationTemp() noexcept;
+
+  /**
+   * @brief Performs temperature compensation on raw sensor data
+   * @return Returns temperature in DegC, double precision. Outpu value of
+   * "51.23" equals 51.23 DegC.
+   */
   [[nodiscard]]
   double compensationTempDouble() noexcept;
 
+  /**
+   * @brief Performs pressure compensation on raw sensor data
+   * @return Returns pressure in Pa as unsigned 32 bit integer. Output value of
+   * "96386" equals 96386 Pa = 963.86 hPa
+   */
   [[nodiscard]]
   uint32_t compensationPress() const noexcept;
+
+  /**
+   * @brief Performs pressure compensation on raw sensor data
+   * @return Returns pressure in Pa as double. Output value of "96386.2" equals
+   * 96386.2 Pa = 963.862 hPa
+   */
   [[nodiscard]]
   double compensationPressDouble() const noexcept;
 
+  /**
+   * @brief Performs humidity compensation on raw sensor data
+   * @return Returns humidity in %RH as usigned 32 bit integer in Q22.10 format
+   * (22 integer and 10 fractional bits). Output value of "47445" represents
+   * 47445/1024 = 46.333 %RH
+   */
   [[nodiscard]]
   uint32_t compensationHum() const noexcept;
+
+  /**
+   * @brief Performs humidity compensation on raw sensor data
+   * @return Returns humidity in %rH as double. Output value of "46.332"
+   * represents 46.332 %rH
+   */
   [[nodiscard]]
   double compensationHumDouble() const noexcept;
 
 private:
+  /**
+   * @brief Reference to the sensor communication bus interface
+   */
   const ISensorBus &_sensorBus;
 
+  /**
+   * @brief Tracks whether the sensor was successfully initialized
+   */
   bool _isInitialized{true};
 
+  /**
+   * @brief Performs a soft reset of the BME280 sensor
+   */
   void reset() const noexcept;
 
+  /**
+   * @brief Checks if calibration data copying is complete
+   * @return true if calibration data is ready, false if still being copied
+   */
   [[nodiscard]]
   bool isCalibrationUpdateDone() const noexcept;
 
+  /**
+   * @brief Sets the SPI interface mode (3-wire or standart 4-wire)
+   * @param spi3W The SPI mode to set (from Spi3W enum)
+   */
   void setSpi3W(const Spi3W spi3W) const noexcept;
+
+  /**
+   * @brief Gets the SPI interface mode (3-wire or standart 4-wire)
+   * @return The SPI mode (from Spi3W enum)
+   */
   [[nodiscard]]
   Spi3W getSpi3W() const noexcept;
 
+  /**
+   * @brief Reads the uncompesated temperature value from sensor
+   * @return Raw temperature ADC value
+   */
   [[nodiscard]]
   int32_t getRawTemp() const noexcept;
+
+  /**
+   * @brief Reads the uncompensated pressure value from sensor
+   * @return Raw pressure ADC value
+   */
   [[nodiscard]]
   int32_t getRawPress() const noexcept;
+
+  /**
+   * @brief Reads the uncompensated humidity value from sensor
+   * @return Raw humidity ADC value
+   */
   [[nodiscard]]
   int32_t getRawHum() const noexcept;
 
+  /**
+   * @brief Reads and stores all calibration coefficients from the sensor's NVM
+   */
   void readCalibData() noexcept;
 
+  /**
+   * @brief Storage for all BME280 sensor calibration coefficients
+   */
   struct {
     uint16_t digT1;
     int16_t digT2;

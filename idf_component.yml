@@ -1,4 +1,4 @@
-version: "1.0.0"
+version: "1.0.1"
 description: "A simple BME280 component for ESP-IDF"
 url: "https://github.com/MaxDevHub/bme280-cpp"
 dependencies:
