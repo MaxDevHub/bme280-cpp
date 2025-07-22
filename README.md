@@ -1,5 +1,13 @@
 # BME280 Component - C++
 
+C++20 driver for Bosch BME280 sensor for ESP-IDF. Supports both I2C and SPI (3-wire and 4-wire) interfaces.
+
+## Add component to project
+
+```bash
+idf.py add-dependency "maxdevhub/bme280-cpp=*"
+```
+
 ## Example of BME280 usage
 
 ```cpp
@@ -8,12 +16,11 @@
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"
 #include "driver/spi_master.h"
-#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-constexpr gpio_num_t I2C_MASTER_SDA = GPIO_NUM_15;
-constexpr gpio_num_t I2C_MASTER_SCL = GPIO_NUM_14;
+constexpr gpio_num_t I2C_SDA = GPIO_NUM_15;
+constexpr gpio_num_t I2C_SCL = GPIO_NUM_14;
 
 constexpr gpio_num_t SPI_MOSI = GPIO_NUM_22;
 constexpr gpio_num_t SPI_MISO = GPIO_NUM_21;
@@ -26,8 +33,8 @@ i2c_master_bus_handle_t bus_handle;
 
 static void i2cInit() {
   i2cMasterBusConfig = {.i2c_port = I2C_NUM_0,
-                        .sda_io_num = I2C_MASTER_SDA,
-                        .scl_io_num = I2C_MASTER_SCL,
+                        .sda_io_num = I2C_SDA,
+                        .scl_io_num = I2C_SCL,
                         .clk_source = I2C_CLK_SRC_DEFAULT,
                         .glitch_ignore_cnt = 7,
                         .flags = {
@@ -89,7 +96,7 @@ extern "C" void app_main(void) {
     
     ...
 
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelay(pdMS_TO_TICKS(10000));
   }
 }
 
